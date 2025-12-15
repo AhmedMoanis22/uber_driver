@@ -206,14 +206,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.0.31"
-  flutter_polyline_points:
-    dependency: "direct main"
-    description:
-      name: flutter_polyline_points
-      sha256: "3a1c8c30abee9fb0fbe44c70d5d1cedb10ef28ec7ea285c669f02b3e183483aa"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "2.1.0"
   flutter_secure_storage:
     dependency: "direct main"
     description:
@@ -328,6 +320,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.2.5"
+  georouter:
+    dependency: "direct main"
+    description:
+      name: georouter
+      sha256: b69677c7b3d2251522e216f747a85546a987f2ffc473ebe333145229301ec39b
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.0.1+1"
   get:
     dependency: "direct main"
     description:
@@ -401,13 +401,13 @@ packages:
     source: hosted
     version: "0.15.6"
   http:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: http
-      sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
+      sha256: "5895291c13fa8a3bd82e76d5627f69e0d85ca6a30dcac95c4ea19a5d555879c2"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "1.6.0"
+    version: "0.13.6"
   http_parser:
     dependency: transitive
     description:

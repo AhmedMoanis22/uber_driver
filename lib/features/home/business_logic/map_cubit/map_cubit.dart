@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:georouter/georouter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../data/repo/home_repo.dart';
@@ -14,9 +17,12 @@ class MapCubit extends Cubit<MapState> {
   Position? currentPosition;
   bool isOnline = false;
   Set<Marker> markers = {};
+  Set<Polyline> polylines = {};
+  List<LatLng> routePoints = [];
   var locationSubscription;
   var simulationSubscription;
   bool isSimulating = false;
+  double currentBearing = 0.0; // Track car rotation angle
 
   void setMapController(GoogleMapController controller) {
     mapController = controller;
@@ -284,6 +290,94 @@ class MapCubit extends Cubit<MapState> {
     );
   }
 
+  // Fetch real route and draw polyline using georouter
+  Future<void> fetchAndDrawRoute({
+    required double startLat,
+    required double startLng,
+    required double endLat,
+    required double endLng,
+  }) async {
+    try {
+      print('🗺️ Fetching route from georouter...');
+
+      final georouter = GeoRouter(mode: TravelMode.driving);
+
+      final coordinates = [
+        PolylinePoint(latitude: startLat, longitude: startLng),
+        PolylinePoint(latitude: endLat, longitude: endLng),
+      ];
+
+      final routePolylinePoints =
+          await georouter.getDirectionsBetweenPoints(coordinates);
+
+      // Convert PolylinePoint list to LatLng list
+      routePoints.clear();
+      if (routePolylinePoints.isNotEmpty) {
+        routePoints = routePolylinePoints
+            .map((point) => LatLng(point.latitude, point.longitude))
+            .toList();
+      }
+
+      // If no points returned, use start and end
+      if (routePoints.isEmpty) {
+        routePoints = [
+          LatLng(startLat, startLng),
+          LatLng(endLat, endLng),
+        ];
+      }
+
+      print('✅ Route fetched with ${routePoints.length} points');
+
+      // Draw polyline on map
+      polylines.clear();
+      polylines.add(
+        Polyline(
+          polylineId: const PolylineId('route'),
+          points: routePoints,
+          color: Colors.blue,
+          width: 5,
+          geodesic: true,
+        ),
+      );
+
+      // Emit state to update the map
+      if (currentPosition != null) {
+        emit(MapLoadedState(currentPosition!));
+      }
+    } on GeoRouterException catch (e) {
+      print('❌ GeoRouter error: ${e.toString()}');
+      // Fallback to direct line
+      _drawDirectPolyline(startLat, startLng, endLat, endLng);
+    } catch (e) {
+      print('❌ Error fetching route: ${e.toString()}');
+      // Fallback to direct line
+      _drawDirectPolyline(startLat, startLng, endLat, endLng);
+    }
+  }
+
+  // Fallback: Draw direct line if route fetching fails
+  void _drawDirectPolyline(
+      double startLat, double startLng, double endLat, double endLng) {
+    routePoints = [
+      LatLng(startLat, startLng),
+      LatLng(endLat, endLng),
+    ];
+
+    polylines.clear();
+    polylines.add(
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: routePoints,
+        color: Colors.blue,
+        width: 5,
+      ),
+    );
+
+    if (currentPosition != null) {
+      emit(MapLoadedState(currentPosition!));
+    }
+  }
+
   // Simulate car movement to pickup location
   Future<void> simulateMovementToPickup({
     required double pickupLat,
@@ -298,21 +392,59 @@ class MapCubit extends Cubit<MapState> {
     final startLat = currentPosition!.latitude;
     final startLng = currentPosition!.longitude;
 
-    // Calculate steps (smaller steps = smoother animation)
-    const totalSteps = 100; // 100 steps for smooth animation
+    // Fetch real route and draw polyline
+    await fetchAndDrawRoute(
+      startLat: startLat,
+      startLng: startLng,
+      endLat: pickupLat,
+      endLng: pickupLng,
+    );
+
+    // Use route points if available, otherwise fall back to direct movement
+    if (routePoints.isEmpty) {
+      routePoints = [
+        LatLng(startLat, startLng),
+        LatLng(pickupLat, pickupLng),
+      ];
+    }
+
+    // Calculate total steps based on route points
     const stepDuration = Duration(milliseconds: 100); // Update every 100ms
-
+    int currentPointIndex = 0;
     int currentStep = 0;
+    const stepsPerSegment = 20; // Steps between each route point
 
-    simulationSubscription = Stream.periodic(stepDuration, (count) => count)
-        .take(totalSteps + 1)
-        .listen((step) async {
-      currentStep = step;
+    simulationSubscription =
+        Stream.periodic(stepDuration, (count) => count).listen((step) async {
+      if (currentPointIndex >= routePoints.length - 1) {
+        // Reached destination
+        print('✅ Reached pickup location!');
+        stopSimulation();
+        onArrived.call();
+        return;
+      }
 
-      // Calculate current position using linear interpolation
-      final progress = step / totalSteps;
-      final currentLat = startLat + (pickupLat - startLat) * progress;
-      final currentLng = startLng + (pickupLng - startLng) * progress;
+      // Get current segment
+      final startPoint = routePoints[currentPointIndex];
+      final endPoint = routePoints[currentPointIndex + 1];
+
+      // Calculate progress within current segment
+      final segmentProgress = (currentStep % stepsPerSegment) / stepsPerSegment;
+
+      // Interpolate position
+      final currentLat = startPoint.latitude +
+          (endPoint.latitude - startPoint.latitude) * segmentProgress;
+      final currentLng = startPoint.longitude +
+          (endPoint.longitude - startPoint.longitude) * segmentProgress;
+
+      // Calculate bearing (rotation angle) between current point and next point
+      final bearing = _calculateBearing(
+        startPoint.latitude,
+        startPoint.longitude,
+        endPoint.latitude,
+        endPoint.longitude,
+      );
+      currentBearing = bearing;
 
       // Update current position
       currentPosition = Position(
@@ -322,17 +454,17 @@ class MapCubit extends Cubit<MapState> {
         accuracy: 0,
         altitude: 0,
         altitudeAccuracy: 0,
-        heading: 0,
+        heading: bearing,
         headingAccuracy: 0,
         speed: 0,
         speedAccuracy: 0,
       );
 
-      // Update car marker
-      await _updateCarMarkerPosition(currentLat, currentLng);
+      // Update car marker with rotation
+      await _updateCarMarkerPosition(currentLat, currentLng, bearing);
 
-      // Update location in database only every 10 steps (once per second) to avoid rate limiting
-      if (currentStep % 10 == 0 || currentStep == totalSteps) {
+      // Update location in database periodically
+      if (currentStep % 10 == 0) {
         _updateLocationInDatabase(currentPosition!);
       }
 
@@ -344,20 +476,20 @@ class MapCubit extends Cubit<MapState> {
       );
 
       print(
-          '🚗 Simulating movement: Step $currentStep/$totalSteps - Lat: $currentLat, Lng: $currentLng');
+          '🚗 Moving on route: Point $currentPointIndex/${routePoints.length - 1}, Step $currentStep - Lat: $currentLat, Lng: $currentLng');
 
-      // When reached destination
-      if (currentStep == totalSteps) {
-        print('✅ Reached pickup location!');
-        stopSimulation();
-        // Call the callback when arrived
-        onArrived.call();
+      currentStep++;
+
+      // Move to next segment when current segment is complete
+      if (currentStep % stepsPerSegment == 0) {
+        currentPointIndex++;
       }
     });
   }
 
   // Update car marker position during simulation
-  Future<void> _updateCarMarkerPosition(double lat, double lng) async {
+  Future<void> _updateCarMarkerPosition(double lat, double lng,
+      [double? bearing]) async {
     if (!isOnline) return;
 
     final carIcon = await _getCarIcon();
@@ -370,7 +502,7 @@ class MapCubit extends Cubit<MapState> {
         markerId: const MarkerId('driver_location'),
         position: LatLng(lat, lng),
         icon: carIcon,
-        rotation: 0,
+        rotation: bearing ?? currentBearing,
         anchor: const Offset(0.5, 0.5),
         flat: true,
         infoWindow: const InfoWindow(
@@ -383,12 +515,42 @@ class MapCubit extends Cubit<MapState> {
     emit(MapLoadedState(currentPosition!));
   }
 
+  // Calculate bearing between two points (for car rotation)
+  double _calculateBearing(double lat1, double lng1, double lat2, double lng2) {
+    final dLng = (lng2 - lng1) * (math.pi / 180);
+    final lat1Rad = lat1 * (math.pi / 180);
+    final lat2Rad = lat2 * (math.pi / 180);
+
+    final y = math.sin(dLng) * math.cos(lat2Rad);
+    final x = math.cos(lat1Rad) * math.sin(lat2Rad) -
+        math.sin(lat1Rad) * math.cos(lat2Rad) * math.cos(dLng);
+
+    final bearing = math.atan2(y, x) * (180 / math.pi);
+    return (bearing + 360) % 360; // Normalize to 0-360
+  }
+
   // Stop simulation
   void stopSimulation() {
     simulationSubscription?.cancel();
     simulationSubscription = null;
     isSimulating = false;
     print('🛑 Simulation stopped');
+  }
+
+  // Clear all markers and polylines
+  void clearMarkersAndPolylines() {
+    markers.clear();
+    polylines.clear();
+    routePoints.clear();
+
+    // Re-add car marker if driver is online
+    if (isOnline && currentPosition != null) {
+      addCarMarker(true);
+    } else if (currentPosition != null) {
+      emit(MapLoadedState(currentPosition!));
+    }
+
+    print('🗑️ Cleared all markers and polylines');
   }
 
   @override

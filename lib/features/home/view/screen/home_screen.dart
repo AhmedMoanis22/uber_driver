@@ -344,6 +344,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     backgroundColor: AppColors.error,
                   );
                 }
+
+                // Handle ride completion
+                if (state is CompletedRidesLoadedState) {
+                  print('✅ Ride completed: ${state.message}');
+                  // Clear all markers and polylines from map
+                  mapCubit.clearMarkersAndPolylines();
+                  // Restart location tracking if driver is online
+                  if (mapCubit.isOnline) {
+                    mapCubit.startLocationTracking();
+                  }
+                }
               },
               builder: (context, homeState) {
                 final homeCubit = context.read<HomeCubit>();
@@ -365,6 +376,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       zoomControlsEnabled: false,
                       mapType: MapType.normal,
                       markers: mapCubit.markers,
+                      polylines: mapCubit.polylines,
                       onMapCreated: (GoogleMapController controller) {
                         mapCubit.setMapController(controller);
                       },
