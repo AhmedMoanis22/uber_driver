@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 
+import '../../../../core/error/error_handler.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/custom_text_field.dart';
 import '../../bussiness_logic/profile_cubit.dart';
@@ -118,22 +118,11 @@ class _VehicleInformationState extends State<VehicleInformation> {
             setState(() {
               _isEditing = false;
             });
-            Fluttertoast.showToast(
-                msg: state.response.message ?? 'Vehicle updated successfully',
-                toastLength: Toast.LENGTH_SHORT,
-                gravity: ToastGravity.BOTTOM,
-                backgroundColor: AppColors.primary,
-                textColor: Colors.white,
-                fontSize: 16.0);
+            ErrorHandler.showSuccess(
+                state.response.message ?? 'Vehicle updated successfully');
           }
           if (state is ProfileUpdatingErrorState) {
-            Fluttertoast.showToast(
-                msg: state.message,
-                toastLength: Toast.LENGTH_SHORT,
-                gravity: ToastGravity.BOTTOM,
-                backgroundColor: AppColors.error,
-                textColor: Colors.white,
-                fontSize: 16.0);
+            ErrorHandler.showError(state.message);
           }
         },
         child: BlocBuilder<ProfileCubit, ProfileState>(

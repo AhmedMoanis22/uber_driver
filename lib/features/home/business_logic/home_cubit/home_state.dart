@@ -67,3 +67,28 @@ class CompletedRidesErrorState extends HomeState {
 
   CompletedRidesErrorState(this.message);
 }
+
+// Ride tracking states
+class RideTrackingState extends HomeState {
+  final String? currentRideId;
+  final bool hasActiveRide;
+  final bool hasTripStarted;
+  final bool hasArrivedAtPickup;
+  final bool hasArrivedAtDropoff;
+  final double? dropoffLat;
+  final double? dropoffLng;
+  final double tripDistance;
+  final int tripDuration;
+
+  RideTrackingState({
+    this.currentRideId,
+    this.hasActiveRide = false,
+    this.hasTripStarted = false,
+    this.hasArrivedAtPickup = false,
+    this.hasArrivedAtDropoff = false,
+    this.dropoffLat,
+    this.dropoffLng,
+    this.tripDistance = 0.0,
+    this.tripDuration = 0,
+  });
+}

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
 import '../theme/app_colors.dart';
@@ -28,8 +29,6 @@ class ErrorHandler {
               message: "Send timeout in connection with the server");
         case DioExceptionType.badCertificate:
           return ApiErrorModel(message: "Bad certificate");
-        default:
-          return ApiErrorModel(message: "Something went wrong");
       }
     } else {
       return ApiErrorModel(message: "Unknown error occurred");
@@ -44,47 +43,53 @@ class ErrorHandler {
     );
   }
 
-  static void showError(String message) {
+  /// Private helper method to display toast messages with common configuration
+  static void _showToast({
+    required String message,
+    required Color backgroundColor,
+    required Color textColor,
+    Toast toastLength = Toast.LENGTH_SHORT,
+  }) {
     Fluttertoast.showToast(
       msg: message,
-      toastLength: Toast.LENGTH_LONG,
+      toastLength: toastLength,
       gravity: ToastGravity.BOTTOM,
+      backgroundColor: backgroundColor,
+      textColor: textColor,
+      fontSize: 16.0,
+    );
+  }
+
+  static void showError(String message) {
+    _showToast(
+      message: message,
       backgroundColor: AppColors.error,
       textColor: AppColors.white,
-      fontSize: 16.0,
+      toastLength: Toast.LENGTH_LONG,
     );
   }
 
   static void showSuccess(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
+    _showToast(
+      message: message,
       backgroundColor: AppColors.success,
       textColor: AppColors.white,
-      fontSize: 16.0,
     );
   }
 
   static void showWarning(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
+    _showToast(
+      message: message,
       backgroundColor: AppColors.warning,
       textColor: AppColors.textPrimary,
-      fontSize: 16.0,
     );
   }
 
   static void showInfo(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
+    _showToast(
+      message: message,
       backgroundColor: AppColors.info,
       textColor: AppColors.white,
-      fontSize: 16.0,
     );
   }
 }
