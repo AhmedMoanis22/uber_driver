@@ -40,7 +40,7 @@ class DriverData {
   final bool isAvailable;
   final double rating;
   final int totalRides;
-  final int totalEarnings;
+  final double totalEarnings;
   final String createdAt;
   final String updatedAt;
   final int v;
@@ -100,7 +100,7 @@ class DriverData {
       isAvailable: json['isAvailable'],
       rating: (json['rating']).toDouble(),
       totalRides: json['totalRides'],
-      totalEarnings: json['totalEarnings'],
+      totalEarnings: (json['totalEarnings'] ?? 0).toDouble(),
       createdAt: json['createdAt'],
       updatedAt: json['updatedAt'],
       v: json['__v'],
